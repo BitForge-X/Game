@@ -6,112 +6,102 @@
 <title>LAN Emoji Hunters</title>
 
 <style>
-    body{
-        margin:0;
-        background:#111;
-        overflow:hidden;
-        font-family:Arial, sans-serif;
-        color:white;
-    }
 
-    #topBar{
-        position:absolute;
-        top:0;
-        left:0;
-        width:100%;
-        height:60px;
-        background:#1a1a1a;
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        padding:0 20px;
-        box-sizing:border-box;
-        z-index:10;
-        border-bottom:2px solid #333;
-    }
+body{
+    margin:0;
+    overflow:hidden;
+    background:#101010;
+    font-family:Arial;
+    color:white;
+}
 
-    #leaderboard{
-        position:absolute;
-        right:10px;
-        top:70px;
-        width:220px;
-        background:rgba(0,0,0,0.7);
-        padding:10px;
-        border-radius:10px;
-        z-index:10;
-    }
+#gameCanvas{
+    background:#181818;
+    display:block;
+}
 
-    #gameCanvas{
-        background:#181818;
-        display:block;
-    }
+#topBar{
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:60px;
+    background:#222;
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+    z-index:10;
+    border-bottom:2px solid #333;
+}
 
-    #menu{
-        position:absolute;
-        top:50%;
-        left:50%;
-        transform:translate(-50%, -50%);
-        background:#222;
-        padding:20px;
-        border-radius:15px;
-        z-index:20;
-        width:350px;
-    }
+#leaderboard{
+    position:absolute;
+    right:10px;
+    top:70px;
+    width:220px;
+    background:rgba(0,0,0,0.7);
+    border-radius:10px;
+    padding:10px;
+    z-index:10;
+}
 
-    input, button, select{
-        width:100%;
-        margin-top:10px;
-        padding:10px;
-        border:none;
-        border-radius:8px;
-        box-sizing:border-box;
-    }
+#menu{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    background:#222;
+    padding:20px;
+    border-radius:15px;
+    width:350px;
+    z-index:20;
+}
 
-    button{
-        background:#00b894;
-        color:white;
-        font-weight:bold;
-        cursor:pointer;
-    }
+input, button, textarea{
+    width:100%;
+    margin-top:10px;
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    box-sizing:border-box;
+}
 
-    button:hover{
-        background:#00d1a0;
-    }
+button{
+    background:#00b894;
+    color:white;
+    font-weight:bold;
+    cursor:pointer;
+}
 
-    #connectionArea{
-        margin-top:15px;
-    }
+button:hover{
+    background:#00d9a5;
+}
 
-    textarea{
-        width:100%;
-        height:100px;
-        margin-top:10px;
-        background:#111;
-        color:#0f0;
-        border:none;
-        padding:10px;
-        box-sizing:border-box;
-        border-radius:10px;
-    }
+textarea{
+    height:100px;
+    background:#111;
+    color:#00ff99;
+}
 
-    .emojiSelect{
-        display:flex;
-        gap:10px;
-        flex-wrap:wrap;
-        margin-top:10px;
-    }
+.emojiContainer{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:10px;
+}
 
-    .emoji{
-        font-size:30px;
-        cursor:pointer;
-        border:2px solid transparent;
-        padding:5px;
-        border-radius:10px;
-    }
+.emoji{
+    font-size:35px;
+    cursor:pointer;
+    border:2px solid transparent;
+    padding:5px;
+    border-radius:10px;
+}
 
-    .selected{
-        border:2px solid cyan;
-    }
+.selected{
+    border:2px solid cyan;
+}
+
 </style>
 </head>
 
@@ -119,7 +109,7 @@
 
 <div id="topBar">
     <div>⏱️ Time: <span id="timer">120</span></div>
-    <div>🎮 LAN Emoji Hunters</div>
+    <div>🎮 Emoji Hunters</div>
     <div>🏆 Score: <span id="score">0</span></div>
 </div>
 
@@ -129,21 +119,29 @@
 </div>
 
 <div id="menu">
-    <h2>Join Game</h2>
+
+    <h2>LAN Emoji Hunters</h2>
 
     <input type="text" id="playerName" placeholder="Enter Name">
 
-    <div class="emojiSelect" id="emojiContainer"></div>
+    <input type="file" id="avatarUpload" accept="image/*">
+
+    <div class="emojiContainer" id="emojiContainer"></div>
 
     <button onclick="startHost()">Create Host</button>
-    <button onclick="joinHost()">Join Host</button>
+    <button onclick="showJoin()">Join Game</button>
 
     <div id="connectionArea"></div>
+
 </div>
 
 <canvas id="gameCanvas"></canvas>
 
 <script>
+
+// ===============================
+// GLOBALS
+// ===============================
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
@@ -151,83 +149,177 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+let peerConnections = {};
+let dataChannels = {};
+let isHost = false;
+
+let timer = 120;
+
 const emojis = ["😎","🤖","👻","🔥","🚀","🐱","💀","🦖"];
+
 let selectedEmoji = "😎";
 
-const emojiContainer = document.getElementById("emojiContainer");
+let pickups = [];
 
-emojis.forEach(e=>{
-    const div = document.createElement("div");
-    div.innerHTML = e;
-    div.className = "emoji";
-    if(e === selectedEmoji) div.classList.add("selected");
-
-    div.onclick = ()=>{
-        document.querySelectorAll(".emoji").forEach(x=>x.classList.remove("selected"));
-        div.classList.add("selected");
-        selectedEmoji = e;
-    }
-
-    emojiContainer.appendChild(div);
-});
+let keys = {};
 
 let player = {
     id:Math.random().toString(36).substring(2),
     x:200,
     y:200,
     score:0,
-    emoji:selectedEmoji,
+    speed:5,
     name:"",
-    speed:5
+    emoji:selectedEmoji,
+    avatar:null,
+    avatarSrc:null
 };
 
 let players = {};
 players[player.id] = player;
 
-let pickups = [];
-let timer = 120;
+// ===============================
+// EMOJI SELECTION
+// ===============================
+
+const emojiContainer = document.getElementById("emojiContainer");
+
+emojis.forEach(e=>{
+
+    const div = document.createElement("div");
+
+    div.className = "emoji";
+
+    div.innerHTML = e;
+
+    if(e === selectedEmoji){
+        div.classList.add("selected");
+    }
+
+    div.onclick = ()=>{
+
+        document.querySelectorAll(".emoji")
+            .forEach(x=>x.classList.remove("selected"));
+
+        div.classList.add("selected");
+
+        selectedEmoji = e;
+
+        player.emoji = e;
+    }
+
+    emojiContainer.appendChild(div);
+
+});
+
+// ===============================
+// AVATAR UPLOAD
+// ===============================
+
+document.getElementById("avatarUpload")
+.addEventListener("change", function(e){
+
+    const file = e.target.files[0];
+
+    if(!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function(event){
+
+        const img = new Image();
+
+        img.src = event.target.result;
+
+        player.avatar = img;
+        player.avatarSrc = event.target.result;
+
+    }
+
+    reader.readAsDataURL(file);
+
+});
+
+// ===============================
+// PICKUPS
+// ===============================
 
 const pickupTypes = [
     {emoji:"💎", points:10},
-    {emoji:"🔥", points:20},
-    {emoji:"⚡", points:15},
-    {emoji:"💀", points:-5},
+    {emoji:"⚡", points:20},
+    {emoji:"🔥", points:15},
+    {emoji:"💀", points:-5}
 ];
 
 function spawnPickup(){
+
     pickups.push({
         x:Math.random()*(canvas.width-100)+50,
         y:Math.random()*(canvas.height-100)+50,
-        type:pickupTypes[Math.floor(Math.random()*pickupTypes.length)]
+        type:pickupTypes[
+            Math.floor(Math.random()*pickupTypes.length)
+        ]
     });
+
+}
+
+for(let i=0;i<5;i++){
+    spawnPickup();
 }
 
 setInterval(spawnPickup, 2000);
 
-for(let i=0;i<5;i++) spawnPickup();
+// ===============================
+// CONTROLS
+// ===============================
 
-let keys = {};
+window.addEventListener("keydown", e=>{
+    keys[e.key] = true;
+});
 
-window.addEventListener("keydown", e=>keys[e.key]=true);
-window.addEventListener("keyup", e=>keys[e.key]=false);
+window.addEventListener("keyup", e=>{
+    keys[e.key] = false;
+});
+
+// ===============================
+// GAME LOOP
+// ===============================
 
 function update(){
 
-    if(keys["w"] || keys["ArrowUp"]) player.y -= player.speed;
-    if(keys["s"] || keys["ArrowDown"]) player.y += player.speed;
-    if(keys["a"] || keys["ArrowLeft"]) player.x -= player.speed;
-    if(keys["d"] || keys["ArrowRight"]) player.x += player.speed;
+    if(keys["w"] || keys["ArrowUp"]){
+        player.y -= player.speed;
+    }
+
+    if(keys["s"] || keys["ArrowDown"]){
+        player.y += player.speed;
+    }
+
+    if(keys["a"] || keys["ArrowLeft"]){
+        player.x -= player.speed;
+    }
+
+    if(keys["d"] || keys["ArrowRight"]){
+        player.x += player.speed;
+    }
 
     pickups.forEach((p,index)=>{
-        let dx = player.x - p.x;
-        let dy = player.y - p.y;
-        let dist = Math.sqrt(dx*dx+dy*dy);
+
+        const dx = player.x - p.x;
+        const dy = player.y - p.y;
+
+        const dist = Math.sqrt(dx*dx + dy*dy);
 
         if(dist < 40){
+
             player.score += p.type.points;
+
             pickups.splice(index,1);
-            document.getElementById("score").innerText = player.score;
+
+            document.getElementById("score")
+                .innerText = player.score;
         }
+
     });
 
     players[player.id] = player;
@@ -240,41 +332,97 @@ function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
     pickups.forEach(p=>{
+
         ctx.font = "40px Arial";
-        ctx.fillText(p.type.emoji,p.x,p.y);
+
+        ctx.fillText(p.type.emoji, p.x, p.y);
+
     });
 
     Object.values(players).forEach(pl=>{
 
-        ctx.font = "50px Arial";
-        ctx.fillText(pl.emoji, pl.x, pl.y);
+        if(pl.avatarSrc){
+
+            if(!pl.avatar){
+
+                const img = new Image();
+
+                img.src = pl.avatarSrc;
+
+                pl.avatar = img;
+            }
+
+            ctx.save();
+
+            ctx.beginPath();
+
+            ctx.arc(pl.x, pl.y, 30, 0, Math.PI*2);
+
+            ctx.closePath();
+
+            ctx.clip();
+
+            ctx.drawImage(
+                pl.avatar,
+                pl.x-30,
+                pl.y-30,
+                60,
+                60
+            );
+
+            ctx.restore();
+
+        }else{
+
+            ctx.font = "50px Arial";
+
+            ctx.fillText(pl.emoji, pl.x, pl.y);
+
+        }
 
         ctx.fillStyle = "white";
+
         ctx.font = "18px Arial";
-        ctx.fillText(pl.name, pl.x-10, pl.y+30);
+
+        ctx.fillText(pl.name, pl.x-20, pl.y+45);
 
     });
 
 }
 
 function gameLoop(){
+
     update();
+
     draw();
+
     requestAnimationFrame(gameLoop);
 }
 
 gameLoop();
 
+// ===============================
+// TIMER
+// ===============================
+
 setInterval(()=>{
+
     timer--;
+
     document.getElementById("timer").innerText = timer;
 
     if(timer <= 0){
+
         alert("Game Over!");
+
         location.reload();
     }
 
 },1000);
+
+// ===============================
+// LEADERBOARD
+// ===============================
 
 function updateLeaderboard(){
 
@@ -283,7 +431,14 @@ function updateLeaderboard(){
     Object.values(players)
         .sort((a,b)=>b.score-a.score)
         .forEach(p=>{
-            html += `<div>${p.emoji} ${p.name} - ${p.score}</div>`;
+
+            html += `
+                <div>
+                    ${p.avatarSrc ? "🖼️" : p.emoji}
+                    ${p.name}
+                    - ${p.score}
+                </div>
+            `;
         });
 
     document.getElementById("playersList").innerHTML = html;
@@ -291,45 +446,63 @@ function updateLeaderboard(){
 
 setInterval(updateLeaderboard,500);
 
-
-
-// ==========================
-// WEBRTC SECTION
-// ==========================
-
-let peerConnections = {};
-let dataChannels = {};
-let isHost = false;
+// ===============================
+// WEBRTC HOST
+// ===============================
 
 function startHost(){
 
-    player.name = document.getElementById("playerName").value || "Host";
-    player.emoji = selectedEmoji;
-
     isHost = true;
 
-    createConnectionUI();
-}
+    player.name =
+        document.getElementById("playerName").value || "Host";
 
-function joinHost(){
+    document.getElementById("connectionArea").innerHTML = `
 
-    player.name = document.getElementById("playerName").value || "Player";
-    player.emoji = selectedEmoji;
+        <button onclick="generateOffer()">
+            Generate Host Key
+        </button>
 
-    createJoinUI();
-}
+        <textarea id="offerBox"
+            placeholder="Host Key"></textarea>
 
-function createConnectionUI(){
+        <textarea id="answerBox"
+            placeholder="Paste Client Answer"></textarea>
 
-    const area = document.getElementById("connectionArea");
+        <button onclick="acceptAnswer()">
+            Connect Player
+        </button>
 
-    area.innerHTML = `
-        <button onclick="generateOffer()">Generate Host Key</button>
-        <textarea id="offerBox" placeholder="Host Key"></textarea>
-        <textarea id="answerBox" placeholder="Paste Client Answer"></textarea>
-        <button onclick="acceptAnswer()">Connect Player</button>
     `;
 }
+
+// ===============================
+// SHOW JOIN UI
+// ===============================
+
+function showJoin(){
+
+    player.name =
+        document.getElementById("playerName").value || "Player";
+
+    document.getElementById("connectionArea").innerHTML = `
+
+        <textarea id="remoteOffer"
+            placeholder="Paste Host Key"></textarea>
+
+        <button onclick="connectToHost()">
+            Connect To Host
+        </button>
+
+        <textarea id="clientAnswer"
+            placeholder="Share This Back To Host"></textarea>
+
+    `;
+}
+
+// ===============================
+// GENERATE OFFER
+// ===============================
 
 async function generateOffer(){
 
@@ -340,9 +513,11 @@ async function generateOffer(){
     setupDataChannel(channel);
 
     peerConnections["pending"] = pc;
+
     dataChannels["pending"] = channel;
 
     const offer = await pc.createOffer();
+
     await pc.setLocalDescription(offer);
 
     document.getElementById("offerBox").value =
@@ -350,38 +525,42 @@ async function generateOffer(){
 
 }
 
+// ===============================
+// ACCEPT ANSWER
+// ===============================
+
 async function acceptAnswer(){
 
     const answer =
-        JSON.parse(atob(document.getElementById("answerBox").value));
+        JSON.parse(
+            atob(document.getElementById("answerBox").value)
+        );
 
     const pc = peerConnections["pending"];
 
     await pc.setRemoteDescription(answer);
 
     alert("Player Connected!");
+
 }
 
-function createJoinUI(){
-
-    const area = document.getElementById("connectionArea");
-
-    area.innerHTML = `
-        <textarea id="remoteOffer" placeholder="Paste Host Key"></textarea>
-        <button onclick="connectToHost()">Connect</button>
-        <textarea id="clientAnswer" placeholder="Client Answer"></textarea>
-    `;
-}
+// ===============================
+// CONNECT TO HOST
+// ===============================
 
 async function connectToHost(){
 
     const offer =
-        JSON.parse(atob(document.getElementById("remoteOffer").value));
+        JSON.parse(
+            atob(document.getElementById("remoteOffer").value)
+        );
 
     const pc = new RTCPeerConnection();
 
     pc.ondatachannel = (event)=>{
+
         setupDataChannel(event.channel);
+
     }
 
     await pc.setRemoteDescription(offer);
@@ -395,10 +574,16 @@ async function connectToHost(){
 
 }
 
+// ===============================
+// DATA CHANNEL
+// ===============================
+
 function setupDataChannel(channel){
 
     channel.onopen = ()=>{
+
         console.log("Connected");
+
     }
 
     channel.onmessage = (event)=>{
@@ -408,30 +593,53 @@ function setupDataChannel(channel){
         if(data.type === "state"){
 
             players = data.players;
+
             pickups = data.pickups;
-        }
 
-        if(data.type === "playerUpdate"){
+            Object.values(players).forEach(pl=>{
 
-            players[data.player.id] = data.player;
+                if(pl.avatarSrc && !pl.avatar){
+
+                    const img = new Image();
+
+                    img.src = pl.avatarSrc;
+
+                    pl.avatar = img;
+
+                }
+
+            });
+
         }
 
     }
 
 }
 
+// ===============================
+// BROADCAST
+// ===============================
+
 function broadcastGameState(){
 
     const data = JSON.stringify({
+
         type:"state",
+
         players:players,
+
         pickups:pickups
+
     });
 
     Object.values(dataChannels).forEach(ch=>{
+
         if(ch.readyState === "open"){
+
             ch.send(data);
+
         }
+
     });
 
 }
