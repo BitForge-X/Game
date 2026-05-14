@@ -3,24 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LAN Emoji Hunters</title>
+<title>LAN Snake Arena</title>
 
 <style>
 
 body{
     margin:0;
     overflow:hidden;
-    background:#101010;
+    background:#111;
     font-family:Arial;
     color:white;
 }
 
-#gameCanvas{
-    background:#181818;
+canvas{
     display:block;
+    background:#181818;
 }
 
-#topBar{
+#topbar{
     position:absolute;
     top:0;
     left:0;
@@ -57,7 +57,7 @@ body{
     z-index:20;
 }
 
-input, button, textarea{
+input, textarea, button{
     width:100%;
     margin-top:10px;
     padding:10px;
@@ -93,9 +93,9 @@ textarea{
 .emoji{
     font-size:35px;
     cursor:pointer;
-    border:2px solid transparent;
     padding:5px;
     border-radius:10px;
+    border:2px solid transparent;
 }
 
 .selected{
@@ -107,20 +107,19 @@ textarea{
 
 <body>
 
-<div id="topBar">
-    <div>⏱️ Time: <span id="timer">120</span></div>
-    <div>🎮 Emoji Hunters</div>
-    <div>🏆 Score: <span id="score">0</span></div>
+<div id="topbar">
+    <div>🐍 LAN Snake Arena</div>
+    <div>Players: <span id="playerCount">1</span>/5</div>
 </div>
 
 <div id="leaderboard">
     <h3>Leaderboard</h3>
-    <div id="playersList"></div>
+    <div id="scores"></div>
 </div>
 
 <div id="menu">
 
-    <h2>LAN Emoji Hunters</h2>
+    <h2>Join Game</h2>
 
     <input type="text" id="playerName" placeholder="Enter Name">
 
@@ -129,60 +128,98 @@ textarea{
     <div class="emojiContainer" id="emojiContainer"></div>
 
     <button onclick="startHost()">Create Host</button>
+
     <button onclick="showJoin()">Join Game</button>
 
     <div id="connectionArea"></div>
 
 </div>
 
-<canvas id="gameCanvas"></canvas>
+<canvas id="game"></canvas>
 
 <script>
 
-// ===============================
-// GLOBALS
-// ===============================
+// ===========================
+// CANVAS
+// ===========================
 
-const canvas = document.getElementById("gameCanvas");
+const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+// ===========================
+// GLOBALS
+// ===========================
+
 let peerConnections = {};
 let dataChannels = {};
+
 let isHost = false;
 
-let timer = 120;
+const GRID = 20;
 
 const emojis = ["😎","🤖","👻","🔥","🚀","🐱","💀","🦖"];
 
 let selectedEmoji = "😎";
 
-let pickups = [];
+const snakes = {};
 
-let keys = {};
+const foods = [];
 
-let player = {
+const keys = {};
+
+// ===========================
+// PLAYER
+// ===========================
+
+const player = {
+
     id:Math.random().toString(36).substring(2),
-    x:200,
-    y:200,
-    score:0,
-    speed:5,
+
     name:"",
+
     emoji:selectedEmoji,
+
     avatar:null,
-    avatarSrc:null
+
+    avatarSrc:null,
+
+    color:randomColor(),
+
+    score:0,
+
+    alive:true,
+
+    direction:"right",
+
+    body:[
+        {x:200,y:200},
+        {x:180,y:200},
+        {x:160,y:200}
+    ]
+
 };
 
-let players = {};
-players[player.id] = player;
+snakes[player.id] = player;
 
-// ===============================
-// EMOJI SELECTION
-// ===============================
+// ===========================
+// RANDOM COLOR
+// ===========================
 
-const emojiContainer = document.getElementById("emojiContainer");
+function randomColor(){
+
+    return `hsl(${Math.random()*360},80%,60%)`;
+
+}
+
+// ===========================
+// EMOJI SELECT
+// ===========================
+
+const emojiContainer =
+    document.getElementById("emojiContainer");
 
 emojis.forEach(e=>{
 
@@ -206,15 +243,16 @@ emojis.forEach(e=>{
         selectedEmoji = e;
 
         player.emoji = e;
+
     }
 
     emojiContainer.appendChild(div);
 
 });
 
-// ===============================
+// ===========================
 // AVATAR UPLOAD
-// ===============================
+// ===========================
 
 document.getElementById("avatarUpload")
 .addEventListener("change", function(e){
@@ -232,6 +270,7 @@ document.getElementById("avatarUpload")
         img.src = event.target.result;
 
         player.avatar = img;
+
         player.avatarSrc = event.target.result;
 
     }
@@ -240,215 +279,288 @@ document.getElementById("avatarUpload")
 
 });
 
-// ===============================
-// PICKUPS
-// ===============================
+// ===========================
+// FOOD
+// ===========================
 
-const pickupTypes = [
-    {emoji:"💎", points:10},
-    {emoji:"⚡", points:20},
-    {emoji:"🔥", points:15},
-    {emoji:"💀", points:-5}
-];
+function spawnFood(){
 
-function spawnPickup(){
+    foods.push({
 
-    pickups.push({
-        x:Math.random()*(canvas.width-100)+50,
-        y:Math.random()*(canvas.height-100)+50,
-        type:pickupTypes[
-            Math.floor(Math.random()*pickupTypes.length)
-        ]
+        x:Math.floor(Math.random()*(canvas.width/GRID))*GRID,
+
+        y:Math.floor(Math.random()*(canvas.height/GRID))*GRID,
+
+        emoji:["🍎","🍕","☕","💎","⚡"][Math.floor(Math.random()*5)]
+
     });
 
 }
 
-for(let i=0;i<5;i++){
-    spawnPickup();
+for(let i=0;i<20;i++){
+    spawnFood();
 }
 
-setInterval(spawnPickup, 2000);
-
-// ===============================
+// ===========================
 // CONTROLS
-// ===============================
+// ===========================
 
 window.addEventListener("keydown", e=>{
-    keys[e.key] = true;
+
+    if(e.key === "ArrowUp" || e.key === "w"){
+        player.direction = "up";
+    }
+
+    if(e.key === "ArrowDown" || e.key === "s"){
+        player.direction = "down";
+    }
+
+    if(e.key === "ArrowLeft" || e.key === "a"){
+        player.direction = "left";
+    }
+
+    if(e.key === "ArrowRight" || e.key === "d"){
+        player.direction = "right";
+    }
+
 });
 
-window.addEventListener("keyup", e=>{
-    keys[e.key] = false;
-});
+// ===========================
+// GAME TICK
+// ===========================
 
-// ===============================
-// GAME LOOP
-// ===============================
+function gameTick(){
 
-function update(){
+    if(!player.alive) return;
 
-    if(keys["w"] || keys["ArrowUp"]){
-        player.y -= player.speed;
+    const head = {...player.body[0]};
+
+    if(player.direction === "up") head.y -= GRID;
+    if(player.direction === "down") head.y += GRID;
+    if(player.direction === "left") head.x -= GRID;
+    if(player.direction === "right") head.x += GRID;
+
+    // wall collision
+
+    if(
+        head.x < 0 ||
+        head.y < 0 ||
+        head.x > canvas.width ||
+        head.y > canvas.height
+    ){
+
+        die();
+
+        return;
     }
 
-    if(keys["s"] || keys["ArrowDown"]){
-        player.y += player.speed;
+    // self collision
+
+    for(let part of player.body){
+
+        if(head.x === part.x && head.y === part.y){
+
+            die();
+
+            return;
+        }
     }
 
-    if(keys["a"] || keys["ArrowLeft"]){
-        player.x -= player.speed;
-    }
+    player.body.unshift(head);
 
-    if(keys["d"] || keys["ArrowRight"]){
-        player.x += player.speed;
-    }
+    // food collision
 
-    pickups.forEach((p,index)=>{
+    let ate = false;
 
-        const dx = player.x - p.x;
-        const dy = player.y - p.y;
+    foods.forEach((food,index)=>{
 
-        const dist = Math.sqrt(dx*dx + dy*dy);
+        if(head.x === food.x && head.y === food.y){
 
-        if(dist < 40){
+            player.score++;
 
-            player.score += p.type.points;
+            ate = true;
 
-            pickups.splice(index,1);
+            foods.splice(index,1);
 
-            document.getElementById("score")
-                .innerText = player.score;
+            spawnFood();
+
         }
 
     });
 
-    players[player.id] = player;
+    if(!ate){
+        player.body.pop();
+    }
 
-    broadcastGameState();
+    snakes[player.id] = player;
+
+    broadcastState();
+
 }
+
+setInterval(gameTick,100);
+
+// ===========================
+// DIE / RESPAWN
+// ===========================
+
+function die(){
+
+    player.alive = false;
+
+    setTimeout(()=>{
+
+        player.body = [
+            {x:200,y:200},
+            {x:180,y:200},
+            {x:160,y:200}
+        ];
+
+        player.score = 0;
+
+        player.alive = true;
+
+    },3000);
+
+}
+
+// ===========================
+// DRAW
+// ===========================
 
 function draw(){
 
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    pickups.forEach(p=>{
+    // foods
 
-        ctx.font = "40px Arial";
+    foods.forEach(food=>{
 
-        ctx.fillText(p.type.emoji, p.x, p.y);
+        ctx.font = "25px Arial";
+
+        ctx.fillText(food.emoji, food.x, food.y);
 
     });
 
-    Object.values(players).forEach(pl=>{
+    // snakes
 
-        if(pl.avatarSrc){
+    Object.values(snakes).forEach(snake=>{
 
-            if(!pl.avatar){
+        ctx.fillStyle = snake.color;
 
-                const img = new Image();
+        snake.body.forEach((part,index)=>{
 
-                img.src = pl.avatarSrc;
+            ctx.fillRect(part.x, part.y, GRID, GRID);
 
-                pl.avatar = img;
+            // head avatar
+
+            if(index === 0){
+
+                if(snake.avatarSrc){
+
+                    if(!snake.avatar){
+
+                        const img = new Image();
+
+                        img.src = snake.avatarSrc;
+
+                        snake.avatar = img;
+
+                    }
+
+                    ctx.save();
+
+                    ctx.beginPath();
+
+                    ctx.arc(
+                        part.x + GRID/2,
+                        part.y + GRID/2,
+                        15,
+                        0,
+                        Math.PI*2
+                    );
+
+                    ctx.clip();
+
+                    ctx.drawImage(
+                        snake.avatar,
+                        part.x,
+                        part.y,
+                        30,
+                        30
+                    );
+
+                    ctx.restore();
+
+                }else{
+
+                    ctx.font = "22px Arial";
+
+                    ctx.fillText(
+                        snake.emoji,
+                        part.x,
+                        part.y + 20
+                    );
+
+                }
+
             }
 
-            ctx.save();
+        });
 
-            ctx.beginPath();
-
-            ctx.arc(pl.x, pl.y, 30, 0, Math.PI*2);
-
-            ctx.closePath();
-
-            ctx.clip();
-
-            ctx.drawImage(
-                pl.avatar,
-                pl.x-30,
-                pl.y-30,
-                60,
-                60
-            );
-
-            ctx.restore();
-
-        }else{
-
-            ctx.font = "50px Arial";
-
-            ctx.fillText(pl.emoji, pl.x, pl.y);
-
-        }
+        // name
 
         ctx.fillStyle = "white";
 
-        ctx.font = "18px Arial";
+        ctx.font = "14px Arial";
 
-        ctx.fillText(pl.name, pl.x-20, pl.y+45);
+        ctx.fillText(
+            snake.name,
+            snake.body[0].x,
+            snake.body[0].y - 10
+        );
 
     });
 
+    updateLeaderboard();
+
+    requestAnimationFrame(draw);
+
 }
 
-function gameLoop(){
+draw();
 
-    update();
-
-    draw();
-
-    requestAnimationFrame(gameLoop);
-}
-
-gameLoop();
-
-// ===============================
-// TIMER
-// ===============================
-
-setInterval(()=>{
-
-    timer--;
-
-    document.getElementById("timer").innerText = timer;
-
-    if(timer <= 0){
-
-        alert("Game Over!");
-
-        location.reload();
-    }
-
-},1000);
-
-// ===============================
+// ===========================
 // LEADERBOARD
-// ===============================
+// ===========================
 
 function updateLeaderboard(){
 
     let html = "";
 
-    Object.values(players)
+    Object.values(snakes)
         .sort((a,b)=>b.score-a.score)
-        .forEach(p=>{
+        .forEach(s=>{
 
             html += `
                 <div>
-                    ${p.avatarSrc ? "🖼️" : p.emoji}
-                    ${p.name}
-                    - ${p.score}
+                    ${s.avatarSrc ? "🖼️" : s.emoji}
+                    ${s.name}
+                    - ${s.score}
                 </div>
             `;
         });
 
-    document.getElementById("playersList").innerHTML = html;
+    document.getElementById("scores").innerHTML = html;
+
+    document.getElementById("playerCount")
+        .innerText = Object.keys(snakes).length;
+
 }
 
-setInterval(updateLeaderboard,500);
-
-// ===============================
-// WEBRTC HOST
-// ===============================
+// ===========================
+// HOST
+// ===========================
 
 function startHost(){
 
@@ -463,8 +575,7 @@ function startHost(){
             Generate Host Key
         </button>
 
-        <textarea id="offerBox"
-            placeholder="Host Key"></textarea>
+        <textarea id="offerBox"></textarea>
 
         <textarea id="answerBox"
             placeholder="Paste Client Answer"></textarea>
@@ -474,11 +585,12 @@ function startHost(){
         </button>
 
     `;
+
 }
 
-// ===============================
-// SHOW JOIN UI
-// ===============================
+// ===========================
+// JOIN
+// ===========================
 
 function showJoin(){
 
@@ -491,18 +603,18 @@ function showJoin(){
             placeholder="Paste Host Key"></textarea>
 
         <button onclick="connectToHost()">
-            Connect To Host
+            Connect
         </button>
 
-        <textarea id="clientAnswer"
-            placeholder="Share This Back To Host"></textarea>
+        <textarea id="clientAnswer"></textarea>
 
     `;
+
 }
 
-// ===============================
-// GENERATE OFFER
-// ===============================
+// ===========================
+// WEBRTC
+// ===========================
 
 async function generateOffer(){
 
@@ -525,35 +637,25 @@ async function generateOffer(){
 
 }
 
-// ===============================
-// ACCEPT ANSWER
-// ===============================
-
 async function acceptAnswer(){
 
-    const answer =
-        JSON.parse(
-            atob(document.getElementById("answerBox").value)
-        );
+    const answer = JSON.parse(
+        atob(document.getElementById("answerBox").value)
+    );
 
     const pc = peerConnections["pending"];
 
     await pc.setRemoteDescription(answer);
 
-    alert("Player Connected!");
+    alert("Player Connected");
 
 }
 
-// ===============================
-// CONNECT TO HOST
-// ===============================
-
 async function connectToHost(){
 
-    const offer =
-        JSON.parse(
-            atob(document.getElementById("remoteOffer").value)
-        );
+    const offer = JSON.parse(
+        atob(document.getElementById("remoteOffer").value)
+    );
 
     const pc = new RTCPeerConnection();
 
@@ -574,9 +676,9 @@ async function connectToHost(){
 
 }
 
-// ===============================
+// ===========================
 // DATA CHANNEL
-// ===============================
+// ===========================
 
 function setupDataChannel(channel){
 
@@ -592,23 +694,11 @@ function setupDataChannel(channel){
 
         if(data.type === "state"){
 
-            players = data.players;
+            Object.assign(snakes, data.snakes);
 
-            pickups = data.pickups;
+            foods.length = 0;
 
-            Object.values(players).forEach(pl=>{
-
-                if(pl.avatarSrc && !pl.avatar){
-
-                    const img = new Image();
-
-                    img.src = pl.avatarSrc;
-
-                    pl.avatar = img;
-
-                }
-
-            });
+            data.foods.forEach(f=>foods.push(f));
 
         }
 
@@ -616,19 +706,19 @@ function setupDataChannel(channel){
 
 }
 
-// ===============================
+// ===========================
 // BROADCAST
-// ===============================
+// ===========================
 
-function broadcastGameState(){
+function broadcastState(){
 
     const data = JSON.stringify({
 
         type:"state",
 
-        players:players,
+        snakes:snakes,
 
-        pickups:pickups
+        foods:foods
 
     });
 
