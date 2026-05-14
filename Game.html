@@ -30,8 +30,8 @@ canvas{
     display:flex;
     justify-content:space-around;
     align-items:center;
-    z-index:10;
     border-bottom:2px solid #333;
+    z-index:10;
 }
 
 #leaderboard{
@@ -40,8 +40,8 @@ canvas{
     top:70px;
     width:220px;
     background:rgba(0,0,0,0.7);
-    border-radius:10px;
     padding:10px;
+    border-radius:10px;
     z-index:10;
 }
 
@@ -93,9 +93,9 @@ textarea{
 .emoji{
     font-size:35px;
     cursor:pointer;
-    padding:5px;
-    border-radius:10px;
     border:2px solid transparent;
+    border-radius:10px;
+    padding:5px;
 }
 
 .selected{
@@ -133,15 +133,19 @@ textarea{
 
     <div id="connectionArea"></div>
 
+    <button onclick="startGame()">
+        Start Match
+    </button>
+
 </div>
 
 <canvas id="game"></canvas>
 
 <script>
 
-// ===========================
+// =====================================
 // CANVAS
-// ===========================
+// =====================================
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -149,30 +153,27 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// ===========================
+// =====================================
 // GLOBALS
-// ===========================
+// =====================================
+
+const GRID = 20;
+
+let isHost = false;
 
 let peerConnections = {};
 let dataChannels = {};
 
-let isHost = false;
-
-const GRID = 20;
+const snakes = {};
+const foods = [];
 
 const emojis = ["😎","🤖","👻","🔥","🚀","🐱","💀","🦖"];
 
 let selectedEmoji = "😎";
 
-const snakes = {};
-
-const foods = [];
-
-const keys = {};
-
-// ===========================
+// =====================================
 // PLAYER
-// ===========================
+// =====================================
 
 const player = {
 
@@ -204,9 +205,9 @@ const player = {
 
 snakes[player.id] = player;
 
-// ===========================
+// =====================================
 // RANDOM COLOR
-// ===========================
+// =====================================
 
 function randomColor(){
 
@@ -214,9 +215,19 @@ function randomColor(){
 
 }
 
-// ===========================
+// =====================================
+// START GAME
+// =====================================
+
+function startGame(){
+
+    document.getElementById("menu").style.display = "none";
+
+}
+
+// =====================================
 // EMOJI SELECT
-// ===========================
+// =====================================
 
 const emojiContainer =
     document.getElementById("emojiContainer");
@@ -250,9 +261,9 @@ emojis.forEach(e=>{
 
 });
 
-// ===========================
+// =====================================
 // AVATAR UPLOAD
-// ===========================
+// =====================================
 
 document.getElementById("avatarUpload")
 .addEventListener("change", function(e){
@@ -279,9 +290,9 @@ document.getElementById("avatarUpload")
 
 });
 
-// ===========================
+// =====================================
 // FOOD
-// ===========================
+// =====================================
 
 function spawnFood(){
 
@@ -301,9 +312,9 @@ for(let i=0;i<20;i++){
     spawnFood();
 }
 
-// ===========================
+// =====================================
 // CONTROLS
-// ===========================
+// =====================================
 
 window.addEventListener("keydown", e=>{
 
@@ -325,9 +336,9 @@ window.addEventListener("keydown", e=>{
 
 });
 
-// ===========================
-// GAME TICK
-// ===========================
+// =====================================
+// GAME LOOP
+// =====================================
 
 function gameTick(){
 
@@ -400,9 +411,9 @@ function gameTick(){
 
 setInterval(gameTick,100);
 
-// ===========================
-// DIE / RESPAWN
-// ===========================
+// =====================================
+// DIE
+// =====================================
 
 function die(){
 
@@ -424,9 +435,9 @@ function die(){
 
 }
 
-// ===========================
+// =====================================
 // DRAW
-// ===========================
+// =====================================
 
 function draw(){
 
@@ -452,7 +463,7 @@ function draw(){
 
             ctx.fillRect(part.x, part.y, GRID, GRID);
 
-            // head avatar
+            // head
 
             if(index === 0){
 
@@ -508,7 +519,7 @@ function draw(){
 
         });
 
-        // name
+        // player name
 
         ctx.fillStyle = "white";
 
@@ -530,9 +541,9 @@ function draw(){
 
 draw();
 
-// ===========================
+// =====================================
 // LEADERBOARD
-// ===========================
+// =====================================
 
 function updateLeaderboard(){
 
@@ -549,6 +560,7 @@ function updateLeaderboard(){
                     - ${s.score}
                 </div>
             `;
+
         });
 
     document.getElementById("scores").innerHTML = html;
@@ -558,9 +570,9 @@ function updateLeaderboard(){
 
 }
 
-// ===========================
+// =====================================
 // HOST
-// ===========================
+// =====================================
 
 function startHost(){
 
@@ -575,7 +587,8 @@ function startHost(){
             Generate Host Key
         </button>
 
-        <textarea id="offerBox"></textarea>
+        <textarea id="offerBox"
+            placeholder="Host Key"></textarea>
 
         <textarea id="answerBox"
             placeholder="Paste Client Answer"></textarea>
@@ -588,9 +601,9 @@ function startHost(){
 
 }
 
-// ===========================
+// =====================================
 // JOIN
-// ===========================
+// =====================================
 
 function showJoin(){
 
@@ -606,15 +619,16 @@ function showJoin(){
             Connect
         </button>
 
-        <textarea id="clientAnswer"></textarea>
+        <textarea id="clientAnswer"
+            placeholder="Share This Back To Host"></textarea>
 
     `;
 
 }
 
-// ===========================
-// WEBRTC
-// ===========================
+// =====================================
+// GENERATE OFFER
+// =====================================
 
 async function generateOffer(){
 
@@ -637,6 +651,10 @@ async function generateOffer(){
 
 }
 
+// =====================================
+// ACCEPT ANSWER
+// =====================================
+
 async function acceptAnswer(){
 
     const answer = JSON.parse(
@@ -650,6 +668,10 @@ async function acceptAnswer(){
     alert("Player Connected");
 
 }
+
+// =====================================
+// CONNECT TO HOST
+// =====================================
 
 async function connectToHost(){
 
@@ -676,9 +698,9 @@ async function connectToHost(){
 
 }
 
-// ===========================
+// =====================================
 // DATA CHANNEL
-// ===========================
+// =====================================
 
 function setupDataChannel(channel){
 
@@ -706,9 +728,9 @@ function setupDataChannel(channel){
 
 }
 
-// ===========================
+// =====================================
 // BROADCAST
-// ===========================
+// =====================================
 
 function broadcastState(){
 
